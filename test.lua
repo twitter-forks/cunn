@@ -1108,8 +1108,6 @@ function cunntest.SpatialConvolutionMM_forward_batch()
             string.format('error on state (forward) with %s', typename))
       end
    end
-
-
 end
 
 function cunntest.SpatialConvolutionMM_backward_single()
@@ -1128,7 +1126,6 @@ function cunntest.SpatialConvolutionMM_backward_single()
 
    local function jacTests(noBias)
       noBias = noBias or false
-
       for k, typename in ipairs(typenames) do
          local input = torch.randn(from,inj,ini):type(typename)
          local gradOutput = torch.randn(to,outj,outi):type(typename)
