@@ -5477,8 +5477,8 @@ function cunntest.IndexLinear()
       local indices = idxMin + torch.LongTensor():randperm(idxMax - idxMin)
       batchILCPU[1][i] = indices[{{1,n}}]
       batchILCPU[2][i] = torch.FloatTensor(n):uniform()
-      batchILGPU[1][i] = torch.LongTensor(n):cuda():copy(batchILCPU[1][i])
-      batchILGPU[2][i] = torch.FloatTensor(n):cuda():copy(batchILCPU[2][i])
+      batchILGPU[1][i] = torch.CudaLongTensor(n):copy(batchILCPU[1][i])
+      batchILGPU[2][i] = torch.CudaTensor(n):copy(batchILCPU[2][i])
       tot = tot + n
    end
 
@@ -5570,8 +5570,8 @@ function cunntest.IndexLinearMaxNorm()
       local indices = idxMin + torch.LongTensor():randperm(idxMax - idxMin)
       batchILCPU[1][i] = indices[{{1,n}}]
       batchILCPU[2][i] = torch.FloatTensor(n):uniform()
-      batchILGPU[1][i] = torch.LongTensor(n):cuda():copy(batchILCPU[1][i])
-      batchILGPU[2][i] = torch.FloatTensor(n):cuda():copy(batchILCPU[2][i])
+      batchILGPU[1][i] = torch.CudaLongTensor(n):copy(batchILCPU[1][i])
+      batchILGPU[2][i] = torch.CudaTensor(n):copy(batchILCPU[2][i])
       tot = tot + n
    end
 
