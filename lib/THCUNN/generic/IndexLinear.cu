@@ -72,8 +72,8 @@ void THNN_(IndexLinear_updateOutput)(
                  maxNormalize, batchId);
         }
     } else {
-        int threads = THREADS_PER_BLOCK;
-        int blocks_x = divup(outDim, threads);
+        dim3 threads(THREADS_X, THREADS_Y);
+        int blocks_x = divup(outDim, threads.x);
         int blocks_y = batchSize;
         dim3 blocks(blocks_x, blocks_y);
         updateOutput<real><<<blocks, threads, 0, stream>>>
