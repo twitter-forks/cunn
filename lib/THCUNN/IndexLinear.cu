@@ -30,8 +30,8 @@ void updateOutput(
     int maxNormalize)
 {
     /*******************************************************
-     * Adapted from the following file in arrayfire
-     * https://github.com/arrayfire/arrayfire/blob/v3.4.1/src/backend/opencl/kernel/csrmm.cl
+     * Adopted from the following file in arrayfire
+     * https://github.com/arrayfire/arrayfire/blob/v3.4.1/src/backend/opencl/kernel/csrmv.cl
      *
      *******************************************************
      * Original copyright notice can be seen below:
@@ -44,16 +44,15 @@ void updateOutput(
      * http://arrayfire.com/licenses/BSD-3-Clause
      ********************************************************/
 
-    const long tidx = threadIdx.x;
-    const long tidy = threadIdx.y;
-    const long tid  = tidy * blockDim.x + tidx;
-    const long gidx = blockIdx.x * blockDim.x + tidx;
-
+    const long goff = blockIdx.x * blockDim.x;
+    const long gidx = goff + threadIdx.x;
+    const long tid = threadIdx.x;
 
     Ty *nWeight = weight;
      // Offset the number of elements specified by  maxNormalize
     weight += gidx + maxNormalize;
     output += gidx;
+
 
     bool within_N = (gidx < outDim);
 
@@ -66,14 +65,13 @@ void updateOutput(
     // Load the nonzero column offsets for current row
     const long batchStart = rowId == 0 ? 0 : cumSumSizes[rowId - 1];
     const long batchEnd   = cumSumSizes[rowId];
-    const long batchStride = blockDim.x * blockDim.y;
 
-    Ty outVal = 0;
+    Ty outval = 0;
     // Since the number of nonzero elements might be greater than local memory available,
     // Load only part of the row into local memory, perform partial dot, repeat until done.
-    for (long id = batchStart; id < batchEnd; id += batchStride) {
+    for (long id = batchStart; id < batchEnd; id += blockDim.x) {
         // Load the current chunk of the row into local memory
-        long lim = min(batchEnd - id, (long)batchStride);
+        long lim = min(batchEnd - id, (long)blockDim.x);
 
         // Subtract 1 from keys[id + tid] to convert base 1 to base 0
         long key = tid < lim ? keys[id + tid] + keysOffset : -1;
@@ -89,22 +87,14 @@ void updateOutput(
         __syncthreads();
 
         // Perform a single "dot" operation for each thread
-        for (long idy = tidy; within_N && idy < lim; idy += blockDim.y) {
-            outVal += s_values[idy] * weight[weightStride * s_keys[idy]];
+        for (long idy = 0; within_N && idy < lim; idy++) {
+            outval += s_values[idy] * weight[weightStride * s_keys[idy]];
         }
         __syncthreads();
     }
 
-    // s_values is no longer used at this point. Reuse it for reducing outVal.
-    // A reduction along the y dimension now gives a single output value along x.
-    s_values[tid] = outVal;
-    for (long y = blockDim.y / 2; y >= 1; y /= 2) {
-        __syncthreads();
-        if (tidy < y) s_values[tid] = s_values[tid] + s_values[tid + y * blockDim.x];
-    }
-
-    if (within_N && tidy == 0) {
-        output[rowId * outDim] = s_values[tid] + bias[gidx];
+    if (within_N) {
+        output[rowId * outDim] = outval + bias[gidx];
     }
 }
 
