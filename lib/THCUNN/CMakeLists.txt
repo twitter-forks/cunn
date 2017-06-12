@@ -1,6 +1,10 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8 FATAL_ERROR)
 CMAKE_POLICY(VERSION 2.8)
 
+IF ("$ENV{STATIC_TH}" STREQUAL "YES")
+  LIST(APPEND CUDA_NVCC_FLAGS "-Xcompiler -fPIC")
+ENDIF()
+
 OPTION(NDEBUG "disable asserts (WARNING: this may result in silent UB e.g. with out-of-bound indices)")
 IF(NOT NDEBUG)
   MESSAGE(STATUS "Removing -DNDEBUG from compile flags")
