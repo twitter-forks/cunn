@@ -129,7 +129,8 @@ local function pointwise_backward(proto_module, name, max_error)
 
       local error = rescuda:double() - groundgrad:double()
 
-      mytester:assertlt(error:abs():max(), precision_backward_type(max_error, typename),
+      mytester:assertlt(error:abs():max(),
+        precision_backward_type(max_error, typename, rescuda:abs():max()),
         string.format('error on state (backward) with %s', typename))
     end
 end
@@ -2962,6 +2963,182 @@ function cunntest.SpatialAdaptiveMaxPooling_backward_batch()
    end
 end
 
+function cunntest.SpatialAdaptiveAveragePooling_forward()
+   local from = math.random(1,64)
+   local to = from
+   local outi = math.random(2,64)
+   local outj = math.random(2,64)
+   local ini = math.random(10,256)
+   local inj = math.random(10,256)
+
+   for k, typename in ipairs(typenames) do
+      local input = torch.randn(from,inj,ini):type(typename)
+      local ctype = t2cpu[typename]
+      input = makeNonContiguous(input:type(ctype))
+      local sconv = nn.SpatialAdaptiveAveragePooling(outi,outj):type(ctype)
+      local groundtruth = sconv:forward(input):type(ctype)
+
+      input = makeNonContiguous(input:type(typename))
+      local gconv = nn.SpatialAdaptiveAveragePooling(outi,outj):type(typename)
+      local rescuda = gconv:forward(input)
+
+      local error = rescuda:double() - groundtruth:double()
+      mytester:assertlt(error:abs():max(), precision_forward_type(precision_forward, typename),
+          string.format('error on state (forward) with %s', typename))
+   end
+end
+
+function cunntest.SpatialAdaptiveAveragePooling_forward_noncontig()
+   local from = math.random(1,64)
+   local to = from
+   local outi = math.random(2,64)
+   local outj = math.random(2,64)
+   local ini = math.random(10,256)
+   local inj = math.random(10,256)
+
+   for k, typename in ipairs(typenames) do
+      local input0 = torch.randn(from,ini,inj):type(typename)
+      local ctype = t2cpu[typename]
+      local input = makeNonContiguous(input0:type(ctype):transpose(2,3))
+      local sconv = nn.SpatialAdaptiveAveragePooling(outi,outj):type(ctype)
+      local groundtruth = sconv:forward(input)
+
+      input = makeNonContiguous(input0:type(typename):transpose(2,3))
+      local gconv = nn.SpatialAdaptiveAveragePooling(outi,outj):type(typename)
+      local rescuda = gconv:forward(input)
+
+      local error = rescuda:double() - groundtruth:double()
+      mytester:assertlt(error:abs():max(), precision_forward_type(precision_forward, typename),
+          string.format('error on state (forward) with %s', typename))
+   end
+end
+
+function cunntest.SpatialAdaptiveAveragePooling_forward_batch()
+   local bs = math.random(4,10)
+   local from = math.random(1,48)
+   local to = from
+   local outi = math.random(2,48)
+   local outj = math.random(2,48)
+   local ini = math.random(10,256)
+   local inj = math.random(10,256)
+
+   for k, typename in ipairs(typenames) do
+      local input = torch.randn(bs,from,inj,ini):type(typename)
+      local ctype = t2cpu[typename]
+      input = makeNonContiguous(input:type(ctype))
+      local sconv = nn.SpatialAdaptiveAveragePooling(outi,outj):type(ctype)
+      local groundtruth = sconv:forward(input)
+
+      input = makeNonContiguous(input:type(typename))
+      local gconv = nn.SpatialAdaptiveAveragePooling(outi,outj):type(typename)
+      local rescuda = gconv:forward(input)
+
+      local error = rescuda:double() - groundtruth:double()
+      mytester:assertlt(error:abs():max(), precision_forward_type(precision_forward, typename),
+          string.format('error on state (forward) with %s', typename))
+   end
+end
+
+function cunntest.SpatialAdaptiveAveragePooling_backward()
+   local from = math.random(1,64)
+   local to = from
+   local outi = math.random(2,64)
+   local outj = math.random(2,64)
+   local ini = math.random(10,256)
+   local inj = math.random(10,256)
+
+   for k, typename in ipairs(typenames) do
+      local input = torch.randn(from,inj,ini):type(typename)
+      local gradOutput = torch.randn(to,outj,outi):type(typename)
+      local ctype = t2cpu[typename]
+      input = makeNonContiguous(input:type(ctype))
+      gradOutput = makeNonContiguous(gradOutput:type(ctype))
+      local sconv = nn.SpatialAdaptiveAveragePooling(outi,outj):type(ctype)
+      sconv:forward(input)
+      sconv:zeroGradParameters()
+      local groundgrad = sconv:backward(input, gradOutput)
+
+      input = makeNonContiguous(input:type(typename))
+      gradOutput = makeNonContiguous(gradOutput:type(typename))
+      local gconv = nn.SpatialAdaptiveAveragePooling(outi,outj):type(typename)
+      gconv:forward(input)
+      gconv:zeroGradParameters()
+      local rescuda = gconv:backward(input, gradOutput)
+
+      local error = rescuda:double() - groundgrad:double()
+
+      mytester:assertlt(error:abs():max(), precision_backward_type(precision_backward, typename),
+          string.format('error on state (backward) with %s', typename))
+   end
+end
+
+function cunntest.SpatialAdaptiveAveragePooling_backward_noncontig()
+   local from = math.random(1,64)
+   local to = from
+   local outi = math.random(2,64)
+   local outj = math.random(2,64)
+   local ini = math.random(10,256)
+   local inj = math.random(10,256)
+
+   for k, typename in ipairs(typenames) do
+      local input0 = torch.randn(from,ini,inj):type(typename)
+      local gradOutput = torch.randn(to,outj,outi):type(typename)
+      local ctype = t2cpu[typename]
+      local input = makeNonContiguous(input0:type(ctype):transpose(2,3))
+      gradOutput = makeNonContiguous(gradOutput:type(ctype))
+      local sconv = nn.SpatialAdaptiveAveragePooling(outi,outj):type(ctype)
+      sconv:forward(input)
+      sconv:zeroGradParameters()
+      local groundgrad = sconv:backward(input, gradOutput)
+
+      input = makeNonContiguous(input0:type(typename):transpose(2,3))
+      gradOutput = makeNonContiguous(gradOutput:type(typename))
+      local gconv = nn.SpatialAdaptiveAveragePooling(outi,outj):type(typename)
+      gconv:forward(input)
+      gconv:zeroGradParameters()
+      local rescuda = gconv:backward(input, gradOutput)
+
+      local error = rescuda:double() - groundgrad:double()
+
+      mytester:assertlt(error:abs():max(), precision_backward_type(precision_backward, typename),
+          string.format('error on state (backward) with %s', typename))
+   end
+end
+
+function cunntest.SpatialAdaptiveAveragePooling_backward_batch()
+   local bs = math.random(4,10)
+   local from = math.random(1,64)
+   local to = from
+   local outi = math.random(2,64)
+   local outj = math.random(2,64)
+   local ini = math.random(10,256)
+   local inj = math.random(10,256)
+
+   for k, typename in ipairs(typenames) do
+      local input = torch.randn(bs,from,inj,ini):type(typename)
+      local gradOutput = torch.randn(bs,to,outj,outi):type(typename)
+      local ctype = t2cpu[typename]
+      input = makeNonContiguous(input:type(ctype))
+      gradOutput = makeNonContiguous(gradOutput:type(ctype))
+      local sconv = nn.SpatialAdaptiveAveragePooling(outi,outj):type(ctype)
+      sconv:forward(input)
+      sconv:zeroGradParameters()
+      local groundgrad = sconv:backward(input, gradOutput)
+
+      input = makeNonContiguous(input:type(typename))
+      gradOutput = makeNonContiguous(gradOutput:type(typename))
+      local gconv = nn.SpatialAdaptiveAveragePooling(outi,outj):type(typename)
+      gconv:forward(input)
+      gconv:zeroGradParameters()
+      local rescuda = gconv:backward(input, gradOutput)
+
+      local error = rescuda:double() - groundgrad:double()
+
+      mytester:assertlt(error:abs():max(), precision_backward_type(precision_backward, typename),
+          string.format('error on state (backward) with %s', typename))
+   end
+end
+
 function cunntest.SpatialLPPooling_forward()
    local from = math.random(1,64)
    local to = from
@@ -3409,11 +3586,13 @@ function cunntest.mse()
          local cout = cmod:forward(cinput,ctarget)
          local cgin = cmod:backward(cinput,ctarget)
 
-         mytester:assertlt(math.abs(fout-cout), precision_forward_type(0.02, typename),
-            string.format('error  on output with %s', typename))
+         mytester:assertlt(math.abs(fout-cout),
+            precision_forward_type(0.03, typename, math.abs(fout)),
+            string.format('error on output with %s', typename))
          local gerr = cgin:double() - fgin:double()
-         mytester:assertlt(gerr:abs():max(), precision_forward_type(precision_forward, typename),
-            string.format('error  on gradInput with %s', typename))
+         mytester:assertlt(gerr:abs():max(),
+            precision_forward_type(precision_forward, typename),
+            string.format('error on gradInput with %s', typename))
       end
    end
 end
@@ -3440,10 +3619,12 @@ function cunntest.SmoothL1()
          local cout = cmod:forward(cinput,ctarget)
          local cgin = cmod:backward(cinput,ctarget)
 
-         mytester:assertlt(math.abs(fout-cout), 0.01, string.format('error  on output with %s', typename))
+         mytester:assertlt(math.abs(fout-cout),
+            math.max(precision_forward_type(precision_forward, typename, math.abs(fout)), 0.01),
+            string.format('error on output with %s', typename))
          local gerr = cgin:double() - fgin:double()
          mytester:assertlt(gerr:abs():max(), precision_forward_type(precision_forward, typename),
-            string.format('error  on gradInput with %s', typename))
+            string.format('error on gradInput with %s', typename))
       end
    end
 end
@@ -3469,10 +3650,10 @@ function cunntest.SoftMarginCriterion()
          local cout = cmod:forward(cinput,ctarget)
          local cgin = cmod:backward(cinput,ctarget)
 
-        mytester:assertlt(math.abs(fout-cout), 0.01, 'error  on output')
+        mytester:assertlt(math.abs(fout-cout), 0.01, 'error on output')
         local gerr = cgin:double() - fgin:double()
         mytester:assertlt(gerr:abs():max(), precision_forward_type(precision_forward, typename),
-           string.format('error  on gradInput with %s', typename))
+           string.format('error on gradInput with %s', typename))
       end
    end
 end
@@ -3501,10 +3682,10 @@ function cunntest.distkldiv()
          local cgin = cmod:backward(cinput,ctarget)
 
          mytester:assertlt(math.abs(fout-cout), precision_forward_type(precision_forward, typename),
-            string.format('error  on output with %s', typename))
+            string.format('error on output with %s', typename))
          local gerr = cgin:double() - fgin:double()
          mytester:assertlt(gerr:abs():max(), precision_backward_type(precision_backward, typename),
-            string.format('error  on gradInput with %s', typename))
+            string.format('error on gradInput with %s', typename))
       end
    end
 end
@@ -3661,6 +3842,275 @@ function cunntest.TemporalConvolution_backward_batch()
         precision_backward_conv_weightbias(precision_backward, typename, biascuda:abs():max()),
         string.format('error on bias (backward) with %s', typename))
    end
+end
+
+
+function cunntest.TemporalRowConvolution_forward_single()
+  local from = math.random(1,64) -- nFeature
+  local to = from
+  local ki = math.random(3,15) -- kW
+  local si = math.random(1,2) -- dW
+  local outi = math.random(1,256) -- nOutputFrame
+  local ini = (outi-1)*si+ki -- nInputFrame
+
+  local function jacTest(noBias, featFirst)
+    noBias = noBias or false
+    featFirst = featFirst or false
+
+    for k, typename in ipairs(typenames) do
+      if typename ~= "torch.CudaHalfTensor" then
+
+        local input
+        if featFirst then
+          input = torch.randn(from, ini):type(typename)
+        else
+          input = torch.randn(ini, from):type(typename)
+        end
+
+        local ctype = t2cpu[typename]
+        input = makeNonContiguous(input:type(ctype))
+        local mod = nn.TemporalRowConvolution(from,ki,si):type(ctype)
+        if featFirst then
+          mod.featFirst = true
+        end
+        if noBias then
+          mod:noBias()
+        end
+        local groundtruth = mod:forward(input)
+
+        input = makeNonContiguous(input:type(typename))
+        local cmod = nn.TemporalRowConvolution(from,ki,si):type(typename)
+
+        if featFirst then
+          cmod.featFirst = true
+        end
+        if noBias then
+          cmod:noBias()
+        end
+        cmod.weight = mod.weight:type(typename)
+        if mod.bias then cmod.bias = mod.bias:type(typename) end
+        local rescuda = cmod:forward(input)
+
+        local error = rescuda:double() - groundtruth:double()
+        mytester:assertlt(error:abs():max(), precision_forward_type(precision_forward, typename),
+          string.format('error on state (forward) with %s', typename))
+      end
+    end
+  end
+  jacTest(false,false)
+  jacTest(false,true)
+  jacTest(true,false)
+  jacTest(true,true)
+end
+
+function cunntest.TemporalRowConvolution_forward_batch()
+  local bs = math.random(4,16)
+  local from = math.random(1,64)
+  local to = from
+  local ki = math.random(3,15)
+  local si = math.random(1,2)
+  local outi = math.random(1,256)
+  local ini = (outi-1)*si+ki
+
+  local function jacTest(noBias,featFirst)
+    noBias = noBias or false
+    featFirst = featFirst or false
+    for k, typename in ipairs(typenames) do
+      if typename ~= "torch.CudaHalfTensor" then
+
+        local input
+        if featFirst then
+          input = torch.randn(bs, from, ini):type(typename)
+        else
+          input = torch.randn(bs, ini, from):type(typename)
+        end
+
+        local ctype = t2cpu[typename]
+        input = makeNonContiguous(input:type(ctype))
+        local mod = nn.TemporalRowConvolution(from,ki,si):type(ctype)
+        if featFirst then
+          mod.featFirst = true
+        end
+        if noBias then
+          mod:noBias()
+        end
+        local groundtruth = mod:forward(input)
+
+        input = makeNonContiguous(input:type(typename))
+        local cmod = nn.TemporalRowConvolution(from,ki,si):type(typename)
+        if featFirst then
+          cmod.featFirst = true
+        end
+        if noBias then
+          cmod:noBias()
+        end
+        cmod.weight = mod.weight:type(typename)
+        if mod.bias then
+          cmod.bias = mod.bias:type(typename)
+        end
+        local rescuda = cmod:forward(input)
+
+        local error = rescuda:double() - groundtruth:double()
+        mytester:assertlt(error:abs():max(), precision_forward_type(precision_forward, typename),
+          string.format('error on state (forward) with %s', typename))
+      end
+    end
+  end
+  jacTest(false,false)
+  jacTest(false,true)
+  jacTest(true,false)
+  jacTest(true,true)
+end
+
+function cunntest.TemporalRowConvolution_backward_single()
+  local from = math.random(1,64) -- nFeature
+  local to = from
+  local ki = math.random(3,15) -- kW
+  local si = math.random(1,2) -- dW
+  local outi = math.random(1,256) -- nOutputFrame
+  local ini = (outi-1)*si+ki -- nInputFrame
+
+  local function jacTest(noBias,featFirst)
+    noBias = noBias or false
+    featFirst = featFirst or false
+    for k, typename in ipairs(typenames) do
+      if typename ~= "torch.CudaHalfTensor" then
+
+        local input, gradOutput
+        if featFirst then
+          input = torch.randn(from, ini):type(typename)
+          gradOutput = torch.randn(to, outi):type(typename)
+        else
+          input = torch.randn(ini, from):type(typename)
+          gradOutput = torch.rand(outi, to):type(typename)
+        end
+
+        local ctype = t2cpu[typename]
+        input = makeNonContiguous(input:type(ctype))
+        gradOutput = makeNonContiguous(gradOutput:type(ctype))
+        local mod = nn.TemporalRowConvolution(from,ki,si):type(ctype)
+        if featFirst then mod.featFirst = true end
+        if noBias then mod:noBias() end
+        mod:forward(input)
+        mod:zeroGradParameters()
+        local groundgrad = mod:backward(input, gradOutput)
+        local groundweight = mod.gradWeight
+        local groundbias = mod.gradBias
+
+        input = makeNonContiguous(input:type(typename))
+        gradOutput = makeNonContiguous(gradOutput:type(typename))
+        local cmod = nn.TemporalRowConvolution(from,ki,si):type(typename)
+        if featFirst then cmod.featFirst = true end
+        if noBias then cmod:noBias() end
+        cmod.weight = mod.weight:type(typename)
+        if cmod.bias then cmod.bias = mod.bias:type(typename) end
+        cmod:forward(input)
+        cmod:zeroGradParameters()
+        local rescuda = cmod:backward(input, gradOutput)
+        local weightcuda = cmod.gradWeight
+
+        local error = rescuda:double() - groundgrad:double()
+        local werror = weightcuda:double() - groundweight:double()
+
+        mytester:assertlt(error:abs():max(), precision_backward_type(precision_backward, typename),
+          string.format('error on state (backward) with %s', typename))
+        mytester:assertlt(werror:abs():max(),
+          precision_backward_conv_weightbias(precision_backward, typename, weightcuda:abs():max()),
+          string.format('error on weight (backward) with %s', typename))
+
+        if cmod.bias then
+          local berror = cmod.gradBias:double() - groundbias:double()
+          mytester:assertlt(berror:abs():max(),
+            precision_backward_conv_weightbias(precision_backward, typename, cmod.gradBias:abs():max()),
+            string.format('error on bias (backward) with %s', typename))
+        end
+      end
+    end
+  end
+  jacTest(false,false)
+  jacTest(false,true)
+  jacTest(true,false)
+  jacTest(true,true)
+end
+
+function cunntest.TemporalRowConvolution_backward_batch()
+  local bs = math.random(4,16)
+  local from = math.random(1,64) -- nFeature
+  local to = from
+  local ki = math.random(3,15) -- kW
+  local si = math.random(1,2) -- dW
+  local outi = math.random(1,256) -- nOutputFrame
+  local ini = (outi-1)*si+ki -- nInputFrame
+
+  local function jacTest(noBias,featFirst)
+    for k, typename in ipairs(typenames) do
+      if typename ~= "torch.CudaHalfTensor" then
+
+        local input, gradOutput
+        if featFirst then
+          input = torch.randn(bs, from, ini):type(typename)
+          gradOutput = torch.randn(bs, to, outi):type(typename)
+        else
+          input = torch.randn(bs, ini, from):type(typename)
+          gradOutput = torch.rand(bs, outi, to):type(typename)
+        end
+
+        local ctype = t2cpu[typename]
+        input = makeNonContiguous(input:type(ctype))
+        gradOutput = makeNonContiguous(gradOutput:type(ctype))
+        local mod = nn.TemporalRowConvolution(from,ki,si):type(ctype)
+        if featFirst then
+          mod.featFirst = true
+        end
+        if noBias then
+          mod:noBias()
+        end
+        mod:forward(input)
+        mod:zeroGradParameters()
+        local groundgrad = mod:backward(input, gradOutput)
+        local groundweight = mod.gradWeight
+        local groundbias = mod.gradBias
+
+        input = makeNonContiguous(input:type(typename))
+        gradOutput = makeNonContiguous(gradOutput:type(typename))
+        local cmod = nn.TemporalRowConvolution(from,ki,si):type(typename)
+        if featFirst then
+          cmod.featFirst = true
+        end
+        if noBias then
+          cmod:noBias()
+        end
+        cmod.weight = mod.weight:type(typename)
+        if cmod.bias then
+          cmod.bias = mod.bias:type(typename)
+        end
+        cmod:forward(input)
+        cmod:zeroGradParameters()
+        local rescuda = cmod:backward(input, gradOutput)
+        local weightcuda = cmod.gradWeight
+
+        local error = rescuda:double() - groundgrad:double()
+        local werror = weightcuda:double() - groundweight:double()
+
+        mytester:assertlt(error:abs():max(), precision_backward_type(precision_backward, typename),
+          string.format('error on state (backward) [batch] with %s', typename))
+        mytester:assertlt(werror:abs():max(),
+          precision_backward_conv_weightbias(precision_backward, typename, weightcuda:abs():max()),
+          string.format('error on weight (backward) [batch] with %s', typename))
+
+        if cmod.bias then
+          local berror = cmod.gradBias:double() - groundbias:double()
+          mytester:assertlt(berror:abs():max(),
+            precision_backward_conv_weightbias(precision_backward, typename, cmod.gradBias:abs():max()),
+            string.format('error on bias (backward) [batch] with %s', typename))
+        end
+      end
+    end
+  end
+  jacTest(false,false)
+  jacTest(false,true)
+  jacTest(true,false)
+  jacTest(true,true)
 end
 
 function cunntest.Dropout()
@@ -4002,11 +4452,13 @@ function cunntest.l1cost()
      local cout = cmod:forward(cinput)
      local cgin = cmod:backward(cinput)
 
-     mytester:assertlt(math.abs(fout-cout), precision_forward_type(precision_forward, typename),
-        string.format('error  on output with %s', typename))
+     mytester:assertlt(math.abs(fout-cout),
+        precision_forward_type(precision_forward, typename, math.abs(fout)),
+        string.format('error on output with %s', typename))
      local gerr = cgin:double() - fgin:double()
-     mytester:assertlt(gerr:abs():max(), precision_forward_type(precision_forward, typename),
-        string.format('error  on gradInput with %s', typename))
+     mytester:assertlt(gerr:abs():max(),
+        precision_forward_type(precision_forward, typename),
+        string.format('error on gradInput with %s', typename))
    end
 end
 
@@ -4033,10 +4485,10 @@ function cunntest.ClassNLLCriterionSingleTarget()
 
       mytester:assertlt(
          math.abs(fout-cout), precision_forward_type(precision_forward, typename),
-            string.format('error  on output with %s', typename))
+            string.format('error on output with %s', typename))
       local gerr = cgin:double() - fgin:double()
       mytester:assertlt(gerr:abs():max(), precision_forward_type(precision_forward, typename),
-         string.format('error  on gradInput with %s', typename))
+         string.format('error on gradInput with %s', typename))
    end
 end
 
@@ -4065,10 +4517,10 @@ function cunntest.ClassNLLCriterionSingleTargetWeights()
 
       mytester:assertlt(
          math.abs(fout-cout), precision_forward_type(precision_forward, typename),
-            string.format('error  on output with %s', typename))
+            string.format('error on output with %s', typename))
       local gerr = cgin:double() - fgin:double()
       mytester:assertlt(gerr:abs():max(), precision_forward_type(precision_forward, typename),
-         string.format('error  on gradInput with %s', typename))
+         string.format('error on gradInput with %s', typename))
    end
 end
 
@@ -4099,7 +4551,7 @@ function cunntest.ClassNLLCriterionMultipleTarget()
 
       local gerr = cgin:double() - fgin:double()
       mytester:assertlt(gerr:abs():max(), precision_forward_type(precision_forward, typename),
-        string.format('error  on gradInput with %s', typename))
+        string.format('error on gradInput with %s', typename))
    end
 end
 
@@ -4133,7 +4585,7 @@ function cunntest.SpatialClassNLLCriterion()
 
       local gerr = cgin:double() - fgin:double()
       mytester:assertlt(gerr:abs():max(), precision_forward_type(precision_forward, typename),
-          string.format('error  on gradInput with %s', typename))
+          string.format('error on gradInput with %s', typename))
     end
 end
 
@@ -4167,8 +4619,31 @@ function cunntest.ClassNLLCriterionMultipleTargetWeights()
 
       local gerr = cgin:double() - fgin:double()
       mytester:assertlt(gerr:abs():max(), precision_forward_type(precision_forward, typename),
-        string.format('error  on gradInput with %s', typename))
+        string.format('error on gradInput with %s', typename))
    end
+end
+
+function cunntest.ClassNLLCriterion_ignoreIndex()
+   local numLabels = 10
+   local batchsize = 4
+   local ignoreIndex = -1
+   local cri = nn.ClassNLLCriterion(nil, nil, ignoreIndex):cuda()
+   local input = torch.randn(numLabels):cuda()
+   local target = ignoreIndex
+   mytester:assert(cri:forward(input, target) == 0)
+   mytester:assert(cri:backward(input, target):abs():sum() == 0)
+   local input = torch.randn(batchsize, numLabels):cuda()
+   local target = torch.LongTensor(batchsize):random(1,numLabels)
+   target[1] = ignoreIndex
+   target = target:cudaLong()
+   local output = cri:forward(input, target)
+   local gradInput = cri:backward(input, target):clone()
+   mytester:assert(gradInput[1]:abs():sum() == 0)
+   local input, target = input:sub(2,batchsize), target:sub(2,batchsize)
+   local output2 = cri:forward(input, target)
+   mytester:assert(math.abs(output2 - output) < 0.0000001)
+   local gradInput2 = cri:backward(input, target)
+   mytester:assertTensorEq(gradInput2, gradInput:sub(2,batchsize), 0.0000001)
 end
 
 function cunntest.TemporalMaxPooling()
@@ -5479,54 +5954,99 @@ function cunntest.IndexLinear()
    local ilc = nn.IndexLinear(isize, osize):float()
    local ilg = nn.IndexLinear(isize, osize):float():cuda()
 
+   local ilc2 = nn.IndexLinear(isize, osize):float()
+   local ilg2 = nn.IndexLinear(isize, osize):float():cuda()
+
    local tot = 0
    local samples = 0
-   local batchILCPU = {{}, {}}
-   local batchILGPU = {{}, {}}
+   local inputCPU = {{}, {}}
+   local inputGPU = {{}, {}}
+   local flatInputCPU = {torch.LongTensor(), torch.FloatTensor(), torch.LongTensor()}
+   local flatInputGPU = {torch.CudaLongTensor(), torch.CudaTensor(), torch.CudaLongTensor()}
+   local sizes = torch.LongTensor(batchSize)
    for i=1,batchSize do
       local n = torch.random(nnzMin, nnzMax)
       local indices = idxMin + torch.LongTensor():randperm(idxMax - idxMin)
-      batchILCPU[1][i] = indices[{{1,n}}]
-      batchILCPU[2][i] = torch.FloatTensor(n):uniform()
-      batchILGPU[1][i] = torch.LongTensor(n):cuda():copy(batchILCPU[1][i])
-      batchILGPU[2][i] = torch.FloatTensor(n):cuda():copy(batchILCPU[2][i])
+      inputCPU[1][i] = indices[{{1,n}}]
+      inputCPU[2][i] = torch.FloatTensor(n):uniform()
+      inputGPU[1][i] = torch.CudaLongTensor(n):copy(inputCPU[1][i])
+      inputGPU[2][i] = torch.CudaTensor(n):copy(inputCPU[2][i])
+      sizes[i] = n
       tot = tot + n
    end
+   flatInputCPU[1]:cat(inputCPU[1], 1)
+   flatInputCPU[2]:cat(inputCPU[2], 1)
+   flatInputCPU[3] = sizes
 
-   local inputSize = #batchILCPU[1]
-   local gradOutsILCPU = torch.FloatTensor(inputSize, osize):uniform()
-   local gradOutsILGPU = torch.CudaTensor(inputSize, osize):copy(gradOutsILCPU)
+   flatInputGPU[1]:cat(inputGPU[1], 1)
+   flatInputGPU[2]:cat(inputGPU[2], 1)
+   flatInputGPU[3] = sizes:cudaLong()
+
+   local inputSize = #inputCPU[1]
+   local gradOutsCPU = torch.FloatTensor(inputSize, osize):uniform()
+   local gradOutsGPU = torch.CudaTensor(inputSize, osize):copy(gradOutsCPU)
+
+   local outputCPU, outputGPU
+   local flatOutputCPU, flatOutputGPU
 
    ilc.weightDecay = weightDecay
    ilg.weightDecay = weightDecay
+   ilc2.weightDecay = weightDecay
+   ilg2.weightDecay = weightDecay
 
    ilc.weight:uniform()
    ilc.bias:fill(1)
+   ilc2.weight:uniform()
+   ilc2.bias:fill(1)
 
    ilg.weight:copy(ilc.weight)
    ilg.bias:copy(ilc.bias)
+   ilg2.weight:copy(ilc2.weight)
+   ilg2.bias:copy(ilc2.bias)
 
    ilc:zeroGradParameters()
-   outILCPU = ilc:forward(batchILCPU)
-   ilc:backward(batchILCPU, gradOutsILCPU);
+   outputCPU = ilc:forward(inputCPU)
+   ilc:backward(inputCPU, gradOutsCPU);
    ilc:updateParameters(lr)
 
+   ilc2:zeroGradParameters()
+   flatOutputCPU = ilc2:forward(flatInputCPU)
+   ilc2:backward(flatInputCPU, gradOutsCPU);
+   ilc2:updateParameters(lr)
+
    ilg:zeroGradParameters()
-   outILGPU = ilg:forward(batchILGPU)
-   ilg:backward(batchILGPU, gradOutsILGPU);
+   outputGPU = ilg:forward(inputGPU)
+   ilg:backward(inputGPU, gradOutsGPU);
    ilg:updateParameters(lr)
 
-   mytester:assertTensorEq(errNorm(outILCPU, outILGPU:float()),
+   ilg2:zeroGradParameters()
+   flatOutputGPU = ilg2:forward(flatInputGPU)
+   ilg2:backward(flatInputGPU, gradOutsGPU);
+   ilg2:updateParameters(lr)
+
+   mytester:assertTensorEq(errNorm(outputCPU, outputGPU:float()),
                            torch.Tensor(1):fill(0),
                            1E-5, "cunn.IndexLinear:forward failed for output")
 
+   mytester:assertTensorEq(errNorm(flatOutputCPU, flatOutputGPU:float()),
+                           torch.Tensor(1):fill(0),
+                           1E-5, "cunn.IndexLinear:forward failed for flatOutput")
+
    mytester:assertTensorEq(ilc.bias,
                            ilg.bias:float(),
-                           1E-5, "cunn.IndexLinear:backward+update failed for bias")
+                           1E-5, "cunn.IndexLinear:backward+update failed for bias for tensor array")
 
    mytester:assertTensorEq(ilc.weight,
                            ilg.weight:float(),
-                           1E-5, "cunn.IndexLinear:backward+update failed for weight")
+                           1E-5, "cunn.IndexLinear:backward+update failed for weight for tensor array")
+
+   mytester:assertTensorEq(ilc2.bias,
+                           ilg2.bias:float(),
+                           1E-5, "cunn.IndexLinear:backward+update failed for bias for flat input")
+
+   mytester:assertTensorEq(ilc2.weight,
+                           ilg2.weight:float(),
+                           1E-5, "cunn.IndexLinear:backward+update failed for weight for flat input")
 
    ilc.weight:uniform()
    ilc.bias:fill(1)
@@ -5534,23 +6054,47 @@ function cunntest.IndexLinear()
    ilg.weight:copy(ilc.weight)
    ilg.bias:copy(ilc.bias)
 
-   outILCPU = ilc:forward(batchILCPU)
-   ilc:backwardUpdate(batchILCPU, gradOutsILCPU, lr);
+   ilc2.weight:uniform()
+   ilc2.bias:fill(1)
 
-   outILGPU = ilg:forward(batchILGPU)
-   ilg:backwardUpdate(batchILGPU, gradOutsILGPU, lr);
+   ilg2.weight:copy(ilc2.weight)
+   ilg2.bias:copy(ilc2.bias)
 
-   mytester:assertTensorEq(errNorm(outILCPU, outILGPU:float()),
+   outputCPU = ilc:forward(inputCPU)
+   ilc:backwardUpdate(inputCPU, gradOutsCPU, lr);
+
+   outputGPU = ilg:forward(inputGPU)
+   ilg:backwardUpdate(inputGPU, gradOutsGPU, lr);
+
+   flatOutputCPU = ilc2:forward(flatInputCPU)
+   ilc2:backwardUpdate(flatInputCPU, gradOutsCPU, lr);
+
+   flatOutputGPU = ilg2:forward(flatInputGPU)
+   ilg2:backwardUpdate(flatInputGPU, gradOutsGPU, lr);
+
+   mytester:assertTensorEq(errNorm(outputCPU, outputGPU:float()),
                            torch.Tensor(1):fill(0),
                            1E-5, "cunn.IndexLinear:forward failed for output")
 
-   mytester:assertTensorEq(ilc.bias,
-                           ilg.bias:float(),
-                           1E-5, "cunn.IndexLinear:backwardUpdate failed for bias")
+   mytester:assertTensorEq(errNorm(flatOutputCPU, flatOutputGPU:float()),
+                           torch.Tensor(1):fill(0),
+                           1E-5, "cunn.IndexLinear:forward failed for flatOutput")
 
    mytester:assertTensorEq(ilc.bias,
                            ilg.bias:float(),
-                           1E-5, "cunn.IndexLinear:backwardUpdate failed for weight")
+                           1E-5, "cunn.IndexLinear:backward+update failed for bias for tensor array")
+
+   mytester:assertTensorEq(ilc.weight,
+                           ilg.weight:float(),
+                           1E-5, "cunn.IndexLinear:backward+update failed for weight for tensor array")
+
+   mytester:assertTensorEq(ilc2.bias,
+                           ilg2.bias:float(),
+                           1E-5, "cunn.IndexLinear:backward+update failed for bias for flat input")
+
+   mytester:assertTensorEq(ilc2.weight,
+                           ilg2.weight:float(),
+                           1E-5, "cunn.IndexLinear:backward+update failed for weight for flat input")
 end
 
 function cunntest.IndexLinearMaxNorm()
@@ -5574,21 +6118,21 @@ function cunntest.IndexLinearMaxNorm()
 
    local tot = 0
    local samples = 0
-   local batchILCPU = {{}, {}}
-   local batchILGPU = {{}, {}}
+   local inputCPU = {{}, {}}
+   local inputGPU = {{}, {}}
    for i=1,batchSize do
       local n = torch.random(nnzMin, nnzMax)
       local indices = idxMin + torch.LongTensor():randperm(idxMax - idxMin)
-      batchILCPU[1][i] = indices[{{1,n}}]
-      batchILCPU[2][i] = torch.FloatTensor(n):uniform()
-      batchILGPU[1][i] = torch.LongTensor(n):cuda():copy(batchILCPU[1][i])
-      batchILGPU[2][i] = torch.FloatTensor(n):cuda():copy(batchILCPU[2][i])
+      inputCPU[1][i] = indices[{{1,n}}]
+      inputCPU[2][i] = torch.FloatTensor(n):uniform()
+      inputGPU[1][i] = torch.CudaLongTensor(n):copy(inputCPU[1][i])
+      inputGPU[2][i] = torch.CudaTensor(n):copy(inputCPU[2][i])
       tot = tot + n
    end
 
-   local inputSize = #batchILCPU[1]
-   local gradOutsILCPU = torch.FloatTensor(inputSize, osize):uniform()
-   local gradOutsILGPU = torch.CudaTensor(inputSize, osize):copy(gradOutsILCPU)
+   local inputSize = #inputCPU[1]
+   local gradOutsCPU = torch.FloatTensor(inputSize, osize):uniform()
+   local gradOutsGPU = torch.CudaTensor(inputSize, osize):copy(gradOutsCPU)
 
    ilc.weightDecay = weightDecay
    ilg.weightDecay = weightDecay
@@ -5600,10 +6144,10 @@ function cunntest.IndexLinearMaxNorm()
    ilg.weight:copy(ilc.weight)
    ilg.bias:copy(ilc.bias)
 
-   outILCPU = ilc:forward(batchILCPU)
-   outILGPU = ilg:forward(batchILGPU)
+   outputCPU = ilc:forward(inputCPU)
+   outputGPU = ilg:forward(inputGPU)
 
-   mytester:assertTensorEq(errNorm(outILCPU, outILGPU:float()),
+   mytester:assertTensorEq(errNorm(outputCPU, outputGPU:float()),
                            torch.Tensor(1):fill(0),
                            1E-5, "cunn.IndexLinear:forward failed for output")
 end
@@ -5828,6 +6372,67 @@ function cunntest.GPU()
 
      cutorch.setDevice(originaldevice)
    end
+end
+
+function cunntest.SpatialDepthWiseConvolution()
+   local epsilon = 0.00001
+
+   local SC = nn.SpatialConvolution
+   local SDWC = nn.SpatialDepthWiseConvolution
+
+   local function spatialDepthWiseConv(
+         nInputPlane, multiplier, kernel, stride, padding, inputSize, weight, bias
+      )
+      local conv = SDWC(nInputPlane, multiplier, kernel, kernel, stride, stride, padding, padding)
+      conv.weight = weight
+      conv.bias = bias
+      return conv
+   end
+
+   -- Utility spatialDepthWiseConv_util() function --------------------------------
+   -- By Alfredo Canziani, alfredo.canziani@gmail.com -----------------------------
+   local function spatialDepthWiseConv_util(
+         nInputPlane, multiplier, kernel, stride, padding, inputSize, weight, bias
+      )
+
+      local conv = nn.Sequential()
+      conv:add(nn.Contiguous())
+      conv:add(nn.View(-1, 1, inputSize, inputSize))
+      conv:add(SC(1, multiplier, kernel, kernel, stride, stride, padding, padding))
+
+      local depthWiseConv = nn.Parallel(2, 2)
+      for channel = 1, nInputPlane do
+         local tempConv = conv:clone()
+         tempConv:get(3).weight = weight:narrow(2, channel, 1):clone()
+         tempConv:get(3).bias = bias:select(2, channel):clone()
+        depthWiseConv:add(tempConv)
+      end
+      depthWiseConv:add(nn.Contiguous())
+      return depthWiseConv
+   end
+
+   local n = 3 -- nInputPlane
+   local s = 28 -- input height and width
+   local b = 3 -- batch size
+   local m = 4 -- multiplier
+   local k = 3 -- kernel size
+   local p = 1 -- padding
+   local st = 1 -- stride
+
+   local testBatch = 1e3 -- number of repetition
+
+   local X = torch.rand(b, n, s, s):cuda() -- 1x3x299x299 images
+   local weight = torch.rand(m, n, k, k):cuda() -- weight
+   local bias = torch.rand(m, n):cuda() -- bias
+
+   local model = spatialDepthWiseConv(n, m, k, st, p, s, weight, bias):cuda()
+   local model_util = spatialDepthWiseConv_util(n, m, k, st, p, s, weight, bias):cuda()
+
+   local Y_util = model_util:forward(X)
+   local Y = model:forward(X)
+
+   local abs_diff = Y_util:clone():csub(Y):abs()
+   mytester:assert(torch.all(abs_diff:lt(epsilon)))
 end
 
 local function setUp()
