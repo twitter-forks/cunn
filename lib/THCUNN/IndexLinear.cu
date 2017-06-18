@@ -35,8 +35,7 @@ void updateOutput(
     const Ty *bias,
     const long weightStride,
     const long keysOffset,
-    const int maxNormalize,
-    const int nnzPerBlock)
+    const int maxNormalize)
 {
     /*******************************************************
      * Adapted from the following file in arrayfire
@@ -73,8 +72,13 @@ void updateOutput(
     // if (rowId >= batchSize) return;
 
     // Load the nonzero column offsets for current row
-    const long batchStart = (rowId == 0 ? 0 : cumSumSizes[rowId - 1]) + blockIdx.z * nnzPerBlock;
-    const long batchEnd   = min(batchStart + nnzPerBlock, cumSumSizes[rowId]);
+    long cumSumSizePrev = (rowId == 0 ? 0 : cumSumSizes[rowId - 1]);
+    long cumSumSizeCurr = cumSumSizes[rowId];
+    long currentSize = cumSumSizeCurr - cumSumSizePrev;
+    const int nnzPerBlock = divup(currentSize, gridDim.z);
+
+    const long batchStart = cumSumSizePrev + blockIdx.z * nnzPerBlock;
+    const long batchEnd   = min(batchStart + nnzPerBlock, cumSumSizeCurr);
     const long batchStride = blockDim.x * blockDim.y;
 
     Ty outVal = 0;
