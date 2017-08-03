@@ -175,14 +175,16 @@ TH_API void THNN_(GRUFused_updateOutput)(
                   THCTensor *bias1, // [OPTIONAL]
                   THCTensor *bias2, // [OPTIONAL]
                   THCTensor *hx,
-                  THCTensor *hy);
+                  THCTensor *hy,
+                  THCTensor *storage);
 
 TH_API void THNN_(GRUFused_updateGradInput)(
                   THCState *state,
-                  THCTensor *input,
-                  THCTensor *hidden,
+                  THCTensor *gradInInput,
+                  THCTensor *gradInHidden,
                   THCTensor *gradOutput,
-                  THCTensor *gradInput);
+                  THCTensor *gradInputHx,
+                  THCTensor *storage);
 
 TH_API void THNN_(LSTMFused_updateOutput)(
                   THCState *state,
@@ -196,13 +198,13 @@ TH_API void THNN_(LSTMFused_updateOutput)(
 
 TH_API void THNN_(LSTMFused_updateGradInput)(
                   THCState *state,
-                  THCTensor *input,
-                  THCTensor *hidden,
+                  THCTensor *storage,
+                  THCTensor *gradInGates,
                   THCTensor *prevC,
                   THCTensor *cy,
                   THCTensor *gradOutput,
                   THCTensor *gradOutputCell,
-                  THCTensor *gradInput);
+                  THCTensor *gradInputCx);
 
 TH_API void THNN_(LogSigmoid_updateOutput)(
                   THCState *state,
@@ -1367,5 +1369,39 @@ TH_API void THNN_(VolumetricReplicationPadding_updateGradInput)(
                   int pleft, int pright,
                   int ptop, int pbottom,
                   int pfront, int pback);
+
+TH_API void THNN_(VolumetricUpSamplingNearest_updateGradInput)(
+                  THCState *state,
+                  THCTensor *input,
+                  THCTensor *gradOutput,
+                  THCTensor *gradInput,
+                  int scale_factor);
+
+TH_API void THNN_(VolumetricUpSamplingNearest_updateOutput)(
+                  THCState *state,
+                  THCTensor *input,
+                  THCTensor *output,
+                  int scale_factor);
+
+TH_API void THNN_(VolumetricUpSamplingTrilinear_updateOutput)(
+                  THCState *state,
+                  THCTensor *input,
+                  THCTensor *output,
+                  int outputDepth,
+                  int outputHeight,
+                  int outputWidth);
+
+TH_API void THNN_(VolumetricUpSamplingTrilinear_updateGradInput)(
+                  THCState *state,
+                  THCTensor *gradOutput,
+                  THCTensor *gradInput,
+                  int nbatch,
+                  int nchannels,
+                  int inputDepth,
+                  int inputHeight,
+                  int inputWidth,
+                  int outputDepth,
+                  int outputHeight,
+                  int outputWidth);
 
 #endif

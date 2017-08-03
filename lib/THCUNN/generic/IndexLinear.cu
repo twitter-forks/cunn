@@ -63,7 +63,6 @@ void THNN_(IndexLinear_updateOutput)(
     int blocks_y = batchSize;
     int nnzPerBlock = ((outDim == 1 || batchSize == 1) ? THREADS_X : NNZ_PER_BLOCK_MAX);
     int blocks_z = divup(nnzPerRow, nnzPerBlock);
-
     dim3 blocks(blocks_x, blocks_y, blocks_z);
 
     if (blocks_z > 1) {
@@ -76,7 +75,7 @@ void THNN_(IndexLinear_updateOutput)(
         normalizedValuesData = THCTensor_(data)(state, normalizedValues);
         updateOutput<real, true><<<blocks, threads, 0, stream>>>
             (outData, normalizedValuesData, valuesData, cumSumSizesData, keysData,
-             batchSize, outDim, weightData, biasData, weightStride, keysOffset, maxNormalize, nnzPerBlock);
+             batchSize, outDim, weightData, biasData, weightStride, keysOffset, maxNormalize);
     } else {
         updateOutput<real, false><<<blocks, threads, 0, stream>>>
             (outData, normalizedValuesData, valuesData, cumSumSizesData, keysData,
