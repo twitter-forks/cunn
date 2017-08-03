@@ -978,9 +978,9 @@ local function BatchNormalization_backward(moduleName, mode, inputSize, backward
     end
 end
 
-local function testBatchNormalization(name, dim, k)
+local function testBatchNormalization(name, dim, k, batchsize)
    local function inputSize()
-      local inputSize = { torch.random(2,32), torch.random(1, k) }
+      local inputSize = { batchsize or torch.random(2,32), torch.random(1, k) }
       for i=1,dim do
          table.insert(inputSize, torch.random(1,k))
       end
@@ -1005,6 +1005,7 @@ end
 
 function cunntest.BatchNormalization()
    testBatchNormalization('BatchNormalization', 0, 128)
+   testBatchNormalization('BatchNormalization', 0, 128, 1) -- test batchsize=1
 end
 
 function cunntest.SpatialBatchNormalization()
@@ -4434,6 +4435,84 @@ function cunntest.SpatialUpSamplingBilinear_backward_batch()
    end
 end
 
+function cunntest.UpSampling_forward_batch()
+   local minibatch = torch.random(1, 10)
+   local f = torch.random(3, 10)
+   local d = torch.random(3, 10)
+   local h = torch.random(3, 10)
+   local w = torch.random(3, 10)
+   local scale = torch.random(2,5)
+
+   for k, typename in ipairs(typenames) do
+      for _,mode in pairs({'nearest','linear'}) do
+         for dim = 4,5 do
+            local input
+            if (dim == 4) then
+               input = torch.randn(minibatch, f, h, w):type(typename)
+            else
+               input = torch.randn(minibatch, f, d, h, w):type(typename)
+            end
+
+            local ctype = t2cpu[typename]
+            input = makeNonContiguous(input:type(ctype))
+            local sconv = nn.UpSampling(scale, mode):type(ctype)
+            local groundtruth = sconv:forward(input)
+
+            input = makeNonContiguous(input:type(typename))
+            local gconv = sconv:clone():type(typename)
+            local rescuda = gconv:forward(input)
+
+            local error = rescuda:double() - groundtruth:double()
+            mytester:assertlt(error:abs():max(), precision_forward_type(precision_forward, typename),
+                string.format('error on state (forward) with %s', typename))
+         end
+      end
+   end
+end
+
+function cunntest.UpSampling_backward_batch()
+   local minibatch = torch.random(1, 10)
+   local f = torch.random(3, 10)
+   local d = torch.random(3, 10)
+   local h = torch.random(3, 10)
+   local w = torch.random(3, 10)
+   local scale = torch.random(2,4)
+
+   for k, typename in ipairs(typenames) do
+      for _,mode in pairs({'nearest','linear'}) do
+         for dim = 4,5 do
+            local input, gradOutput
+            if (dim == 4) then
+               input = torch.randn(minibatch, f, h, w):type(typename)
+               gradOutput = torch.randn(minibatch, f, h*scale, w*scale):type(typename)
+            else
+               input = torch.randn(minibatch, f, d, h, w):type(typename)
+               gradOutput = torch.randn(minibatch, f, d*scale, h*scale, w*scale):type(typename)
+            end
+
+            local ctype = t2cpu[typename]
+            input = makeNonContiguous(input:type(ctype))
+            gradOutput = makeNonContiguous(gradOutput:type(ctype))
+            local sconv = nn.UpSampling(scale, mode):type(ctype)
+            sconv:forward(input)
+            sconv:zeroGradParameters()
+            local groundgrad = sconv:backward(input, gradOutput)
+
+            input = makeNonContiguous(input:type(typename))
+            gradOutput = makeNonContiguous(gradOutput:type(typename))
+            local gconv = sconv:clone():type(typename)
+            gconv:forward(input)
+            gconv:zeroGradParameters()
+            local rescuda = gconv:backward(input, gradOutput)
+
+            local error = rescuda:double() - groundgrad:double()
+            mytester:assertlt(error:abs():max(), precision_backward_type(precision_backward, typename),
+                string.format('error on state (backward) with %s', typename))
+         end
+      end
+   end
+end
+
 function cunntest.l1cost()
    local size = math.random(300,500)
 
@@ -5197,6 +5276,149 @@ function cunntest.VolumetricAveragePooling_backward()
       local error = gradInputCUDA:double() - gradInput:double()
       mytester:assertlt(error:abs():max(), precision_forward_type(precision_forward, typename),
         string.format('error on state (backward) with %s', typename))
+   end
+end
+
+function cunntest.FeatureLPPooling_forward()
+   for tries = 1, 5 do
+      local batch_mode = {true, false}
+      batch_mode = batch_mode[math.random(1, 2)]
+      local power = {2, 3}
+      power = power[math.random(1, 2)]
+
+      local dims = math.random(1, 3)
+
+      if batch_mode then
+         dims = dims + 1
+      end
+
+      local width = torch.random(2, 16)
+      local stride = torch.random(1, 4)
+
+      local output_size = torch.random(1, 100)
+      local input_size = (output_size - 1) * stride + width
+
+      local baseInput = nil
+      if dims == 1 then
+         baseInput = torch.Tensor(input_size):uniform()
+      elseif dims == 2 then
+         if batch_mode then
+            baseInput = torch.Tensor(math.random(1, 5), input_size):uniform()
+         else
+            baseInput = torch.Tensor(input_size, math.random(1, 5)):uniform()
+         end
+      elseif dims == 3 then
+         if batch_mode then
+            baseInput = torch.Tensor(math.random(1, 5), input_size,
+                                     math.random(1, 5)):uniform()
+         else
+            baseInput = torch.Tensor(input_size, math.random(1, 5),
+                                     math.random(1, 5)):uniform()
+         end
+      else
+         baseInput = torch.Tensor(math.random(1, 5), input_size,
+                                  math.random(1, 5), math.random(1, 5)):uniform()
+      end
+
+      for k, typename in ipairs(typenames) do
+         local input = baseInput:type(typename)
+
+         local ctype = t2cpu[typename]
+         input = makeNonContiguous(input:type(ctype))
+         local sconv = nn.FeatureLPPooling(width, stride, power, batch_mode):type(ctype)
+         local groundtruth = sconv:forward(input)
+
+         input = makeNonContiguous(input:type(typename))
+         local gconv = nn.FeatureLPPooling(width, stride, power, batch_mode):type(typename)
+         local rescuda = gconv:forward(input)
+
+         local error = rescuda:double() - groundtruth:double()
+         mytester:assertlt(error:abs():max(),
+                           precision_forward_type(precision_forward, typename),
+                           string.format('error on state (forward) with %s', typename))
+      end
+   end
+end
+
+function cunntest.FeatureLPPooling_backward()
+   for tries = 1, 5 do
+      local batch_mode = {true, false}
+      batch_mode = batch_mode[math.random(1, 2)]
+      local power = {2, 3}
+      power = power[math.random(1, 2)]
+
+      local dims = math.random(1, 3)
+
+      if batch_mode then
+         dims = dims + 1
+      end
+
+      local width = torch.random(2, 16)
+      local stride = torch.random(1, 4)
+
+      local output_size = torch.random(1, 100)
+      local input_size = (output_size - 1) * stride + width
+
+      local baseInput = nil
+      local baseGradOutput = nil
+
+      if dims == 1 then
+         baseInput = torch.Tensor(input_size):uniform()
+         baseGradOutput = torch.Tensor(output_size):uniform()
+      elseif dims == 2 then
+         local a = math.random(1, 5)
+         if batch_mode then
+            baseInput = torch.Tensor(a, input_size):uniform()
+            baseGradOutput = torch.Tensor(a, output_size):uniform()
+         else
+            baseInput = torch.Tensor(input_size, a):uniform()
+            baseGradOutput = torch.Tensor(output_size, a):uniform()
+         end
+      elseif dims == 3 then
+         local a = math.random(1, 5)
+         local b = math.random(1, 5)
+         if batch_mode then
+            baseInput = torch.Tensor(a, input_size, b):uniform()
+            baseGradOutput = torch.Tensor(a, output_size, b):uniform()
+         else
+            baseInput = torch.Tensor(input_size, a, b):uniform()
+            baseGradOutput = torch.Tensor(output_size, a, b):uniform()
+         end
+      else
+         local a = math.random(1, 5)
+         local b = math.random(1, 5)
+         local c = math.random(1, 5)
+         baseInput = torch.Tensor(a, input_size, b, c):uniform()
+         baseGradOutput = torch.Tensor(a, output_size, b, c):uniform()
+      end
+
+      for k, typename in ipairs(typenames) do
+         local input = baseInput:type(typename)
+         local gradOutput = baseGradOutput:type(typename)
+         local ctype = t2cpu[typename]
+         input = makeNonContiguous(input:type(ctype))
+         gradOutput = makeNonContiguous(gradOutput:type(ctype))
+
+         local sconv = nn.FeatureLPPooling(width, stride, power, batch_mode):type(ctype)
+         if ceil_mode then sconv:ceil() end
+         sconv:forward(input)
+         sconv:zeroGradParameters()
+         local groundgrad = sconv:backward(input, gradOutput)
+
+         input = makeNonContiguous(input:type(typename))
+         gradOutput = makeNonContiguous(gradOutput:type(typename))
+         local gconv = nn.FeatureLPPooling(width, stride, power, batch_mode):type(typename)
+         if ceil_mode then gconv:ceil() end
+
+         gconv:forward(input)
+         gconv:zeroGradParameters()
+         local rescuda = gconv:backward(input, gradOutput)
+
+         local error = rescuda:double() - groundgrad:double()
+
+         mytester:assertlt(error:abs():max(), precision_backward_type(precision_backward, typename),
+                           string.format('error on state (backward) with %s', typename))
+      end
    end
 end
 

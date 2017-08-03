@@ -75,7 +75,7 @@ void THNN_(IndexLinear_updateOutput)(
         normalizedValuesData = THCTensor_(data)(state, normalizedValues);
         updateOutput<real, true><<<blocks, threads, 0, stream>>>
             (outData, normalizedValuesData, valuesData, cumSumSizesData, keysData,
-             batchSize, outDim, weightData, biasData, weightStride, keysOffset, maxNormalize);
+             batchSize, outDim, weightData, biasData, weightStride, keysOffset, maxNormalize, nnzPerBlock);
     } else {
         updateOutput<real, false><<<blocks, threads, 0, stream>>>
             (outData, normalizedValuesData, valuesData, cumSumSizesData, keysData,
